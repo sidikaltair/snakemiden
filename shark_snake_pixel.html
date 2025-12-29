@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pixel MIDEN SNAKE</title>
+    <style>
+      :root {
+        --bg: #0b0b0b;
+        --fg: #e5e5e5;
+        --accent: #f5630f;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+          Arial;
+      }
+      .wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+      }
+      h1 {
+        font-size: clamp(20px, 3vw, 28px);
+        margin: 6px 0;
+      }
+      canvas {
+        background: #000;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+        border-radius: 12px;
+        image-rendering: pixelated;
+      }
+      .hud {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .badge {
+        padding: 6px 10px;
+        background: #111;
+        border: 1px solid #222;
+        border-radius: 999px;
+      }
+      .note {
+        font-size: 13px;
+        opacity: 0.75;
+      }
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .row {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+      }
+      button {
+        background: #151515;
+        color: var(--fg);
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Miden Snake</h1>
+      <div id="hello" class="note" style="opacity: 0.9"></div>
+      <div class="hud">
+        <div class="badge">Score: <span id="score">0</span></div>
+        <div class="badge">Level: <span id="level">1</span></div>
+        <div class="badge">Best: <span id="best">0</span></div>
+        <div class="badge">
+          <span class="note">Arrows/WASD Move • Space pause • R restart</span>
+        </div>
+      </div>
+      <canvas id="game" width="480" height="480"></canvas>
+      <div class="hud" style="margin: 10px 0">
+        <button
+          id="shareX"
+          style="
+            background: #f07809;
+            color: #f8f8f7;
+            font-weight: bold;
+            padding: 8px 12px;
+            border-radius: 12px;
+            cursor: pointer;
+          "
+        >
+          Share on X (Twitter)
+        </button>
+      </div>
+      <div class="controls">
+        <div class="row"><button id="up">▲</button></div>
+        <div class="row">
+          <button id="left">◀</button><button id="pause">⏸/▶</button
+          ><button id="right">▶</button>
+        </div>
+        <div class="row"><button id="down">▼</button></div>
+      </div>
+      <p class="note">gMiden</p>
+    </div>
+
+    <img id="sharkHead" style="display: none" src="head.png" />
+    <img id="foodImg" style="display: none" src="logo.png" />
+
+    <script>
+      (() => {
+        const canvas = document.getElementById("game");
+        const ctx = canvas.getContext("2d");
+        const headImg = document.getElementById("sharkHead");
+        const foodImg = document.getElementById("foodImg");
+        const scoreEl = document.getElementById("score");
+        const levelEl = document.getElementById("level");
+        const bestEl = document.getElementById("best");
+
+        const COLS = 8,
+          ROWS = 8;
+        const CELL = Math.floor(canvas.width / COLS);
+        canvas.width = COLS * CELL;
+        canvas.height = ROWS * CELL;
+
+        const SPEEDS = [350, 300, 250, 200, 160, 130, 100];
+        let snake, dir, nextDir, food, score, level, best, timer, running;
+
+        best = Number(localStorage.getItem("snake_best") || 0);
+        bestEl.textContent = best;
+
+        function randCell() {
+          return [
+            Math.floor(Math.random() * COLS),
+            Math.floor(Math.random() * ROWS),
+          ];
+        }
+
+        function reset() {
+          snake = [[4, 4]];
+          dir = [1, 0];
+          nextDir = [1, 0];
+          score = 0;
+          level = 1;
+          placeFood();
+          running = true;
+          if (timer) clearInterval(timer);
+          timer = setInterval(loop, SPEEDS[level - 1]);
+          updateHUD();
+        }
+
+        function placeFood() {
+          do {
+            food = randCell();
+          } while (snake.some((s) => s[0] === food[0] && s[1] === food[1]));
+        }
+
+        function setDir(x, y) {
+          if (x === -dir[0] && y === -dir[1]) return;
+          nextDir = [x, y];
+        }
+
+        function updateHUD() {
+          scoreEl.textContent = score;
+          levelEl.textContent = level;
+          if (score > best) {
+            best = score;
+            localStorage.setItem("snake_best", best);
+          }
+          bestEl.textContent = best;
+        }
+
+        function levelUpCheck() {
+          let newLevel = Math.min(1 + Math.floor(score / 3), SPEEDS.length);
+          if (newLevel !== level) {
+            level = newLevel;
+            clearInterval(timer);
+            timer = setInterval(loop, SPEEDS[level - 1]);
+          }
+        }
+
+        function drawSnake() {
+          for (let i = 0; i < snake.length; i++) {
+            const [x, y] = snake[i];
+            const px = x * CELL,
+              py = y * CELL;
+            if (i === snake.length - 1) {
+              ctx.save();
+              ctx.translate(px + CELL / 2, py + CELL / 2);
+              let ang = 0;
+              if (dir[0] === 1) ang = 0;
+              if (dir[0] === -1) ang = Math.PI;
+              if (dir[1] === 1) ang = Math.PI / 2;
+              if (dir[1] === -1) ang = -Math.PI / 2;
+              ctx.rotate(ang);
+              ctx.drawImage(headImg, -CELL / 2, -CELL / 2, CELL, CELL);
+              ctx.restore();
+            } else {
+              const grad = ctx.createLinearGradient(
+                px,
+                py,
+                px + CELL,
+                py + CELL
+              );
+              grad.addColorStop(0, "#fb923c");
+              grad.addColorStop(1, "#ea580c");
+              ctx.fillStyle = grad;
+              ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
+            }
+          }
+        }
+
+        function drawFood() {
+          const [x, y] = food;
+          ctx.drawImage(
+            foodImg,
+            x * CELL + CELL * 0.1,
+            y * CELL + CELL * 0.1,
+            CELL * 0.8,
+            CELL * 0.8
+          );
+        }
+
+        function loop() {
+          dir = nextDir;
+          const head = snake[snake.length - 1];
+          let nx = (head[0] + dir[0] + COLS) % COLS,
+            ny = (head[1] + dir[1] + ROWS) % ROWS;
+          if (snake.some(([x, y]) => x === nx && y === ny)) {
+            gameOver();
+            return;
+          }
+          snake.push([nx, ny]);
+          if (nx === food[0] && ny === food[1]) {
+            score++;
+            placeFood();
+            levelUpCheck();
+            updateHUD();
+          } else {
+            snake.shift();
+          }
+          ctx.fillStyle = "#000";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          drawFood();
+          drawSnake();
+        }
+
+        function gameOver() {
+          running = false;
+          clearInterval(timer);
+          ctx.fillStyle = "rgba(0,0,0,.7)";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "#fff";
+          ctx.textAlign = "center";
+          ctx.font = "bold 26px sans-serif";
+          ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 10);
+          ctx.font = "16px sans-serif";
+          ctx.fillText(
+            "Score " + score + " — Press R",
+            canvas.width / 2,
+            canvas.height / 2 + 20
+          );
+        }
+
+        window.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowUp" || e.key === "w") setDir(0, -1);
+          else if (e.key === "ArrowDown" || e.key === "s") setDir(0, 1);
+          else if (e.key === "ArrowLeft" || e.key === "a") setDir(-1, 0);
+          else if (e.key === "ArrowRight" || e.key === "d") setDir(1, 0);
+          else if (e.key === " ") running = !running;
+          else if (e.key === "r") reset();
+        });
+        document.getElementById("up").onclick = () => setDir(0, -1);
+        document.getElementById("down").onclick = () => setDir(0, 1);
+        document.getElementById("left").onclick = () => setDir(-1, 0);
+        document.getElementById("right").onclick = () => setDir(1, 0);
+        document.getElementById("pause").onclick = () => (running = !running);
+
+        reset();
+      })();
+    </script>
+
+    <script>
+      const handle = localStorage.getItem("shark_username") || "";
+      const hello = document.getElementById("hello");
+      if (hello) {
+        hello.textContent = handle ? `Welcome ${handle} 👋` : "Welcome 👋";
+      }
+
+      function openTweetWithScore() {
+        const scoreEl = document.getElementById("score");
+        const score = scoreEl ? parseInt(scoreEl.textContent || "0", 10) : 0;
+        const text = `${
+          handle ? handle + " " : ""
+        }just take score ${score} on Miden Snake🎮!`;
+        const shareUrl = window.location.href.split("#")[0];
+        const intent = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+          text
+        )}&url=${encodeURIComponent(shareUrl)}&hashtags=SnakeGame,Miden,ZK`;
+        window.open(intent, "_blank", "noopener,noreferrer");
+      }
+
+      const shareBtn = document.getElementById("shareX");
+      if (shareBtn) {
+        shareBtn.addEventListener("click", openTweetWithScore);
+      }
+    </script>
+  </body>
+</html>

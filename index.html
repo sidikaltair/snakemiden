@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MIDEN SNAKE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body
+    class="text-white min-h-screen flex flex-col justify-center items-center relative overflow-hidden"></body>
+    <div class="relative z-10 flex flex-col item-center">
+      <p>MIDEN SNAKE</p>
+    </div>
+    <img src="orang.png" class="w-40 md:w-56 lg:w-72">
+
+    <!-- MAIN CONTENT -->
+    <div class="relative z-10 flex flex-col items-center">
+      <!-- Input + Button -->
+      <div class="flex bg-gray-900/80 rounded-xl overflow-hidden shadow-lg">
+        <input
+          id="username"
+          type="text"
+          placeholder="@0x_zeros"
+          class="px-4 py-2 bg-transparent text-white outline-none w-72"
+        />
+        <button
+          id="startBtn"
+          class="bg-sky-400 text-black font-bold px-4 hover:bg-sky-300"
+        >
+          Start
+        </button>
+      </div>
+
+      <!-- Footer text -->
+    <p class="mt-6 text-sm text-gray-900 text-center">
+        TEST YOUR SKILL ON GAME MIDEN SNAKE <br />✨
+      </p>
+    </div>
+
+    <script>
+      const input = document.getElementById("username");
+      const btn = document.getElementById("startBtn");
+
+      function normalizeHandle(v) {
+        v = (v || "").trim();
+        if (!v) return "";
+        try {
+          if (v.startsWith("http")) {
+            const u = new URL(v);
+            const parts = u.pathname.split("/").filter(Boolean);
+            if (parts[0]) v = parts[0];
+          }
+        } catch {}
+        if (!v.startsWith("@")) v = "@" + v.replace(/^@+/, "");
+        return v;
+      }
+
+      btn.addEventListener("click", () => {
+        const raw = input.value;
+        const handle = normalizeHandle(raw);
+        if (!handle) {
+          alert('Input your username with "@" 🙂');
+          input.focus();
+          return;
+        }
+        localStorage.setItem("shark_username", handle);
+        window.location.href = "shark_snake_pixel.html";
+      });
+
+      const saved = localStorage.getItem("shark_username");
+      if (saved) input.value = saved.replace(/^@/, "");
+    </script>
+  </body>
+</html>
